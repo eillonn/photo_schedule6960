@@ -1,0 +1,179 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>撮影スケジュールテンプレート</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; line-height: 1.6; background: #f9f9f9; }
+    h1, h2 { border-bottom: 2px solid #ccc; padding-bottom: 5px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; vertical-align: top; word-break: break-word; }
+    th { background: #eee; }
+    textarea, input { width: 100%; box-sizing: border-box; padding: 6px; margin-top: 4px; }
+    .section { background: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+    .button { padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; }
+    .button:hover { background: #0056b3; }
+    .image-preview { max-width: 100px; max-height: 100px; display: block; margin-top: 6px; cursor: pointer; }
+    #image-gallery img { max-width: 100px; max-height: 100px; margin: 5px; }
+    @media print {
+      input[type="file"] { display: none !important; }
+      body { background: white; }
+      .button { display: none !important; }
+      input, textarea { border: none; outline: none; height: auto; white-space: pre-wrap; background: none; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>撮影スケジュールテンプレート</h1>
+
+<div class="section">
+  <h2>撮影概要</h2>
+  <label>プロジェクト名：<input type="text" placeholder="例：○○株式会社 企業サイト用撮影" /></label><br><br>
+  <label>クライアント名：<input type="text" /></label><br><br>
+  <label>撮影日：<input type="date" /></label><br><br>
+  <label>撮影場所：<input type="text" placeholder="複数ある場合はカンマ区切り" /></label><br><br>
+  <label>カメラマン名：<input type="text" /></label><br><br>
+  <label>担当者名：<input type="text" /></label><br><br>
+  <button class="button" onclick="window.print()">🖨️ PDF出力</button>
+</div>
+
+<div class="section">
+  <h2>タイムスケジュール（合計所要時間：<span id="total-time">0</span> 分）</h2>
+  <table id="schedule-table">
+    <thead>
+      <tr>
+        <th>開始時間</th>
+        <th>終了時間</th>
+        <th>所要時間（分）</th>
+        <th>撮影内容</th>
+        <th>場所</th>
+        <th>参加人数</th>
+        <th>参加者</th>
+        <th>備考</th>
+        <th>撮影イメージ</th>
+      </tr>
+    </thead>
+    <tbody id="schedule-body">
+    </tbody>
+  </table>
+  <button class="button" onclick="addScheduleRow()">＋ 行を追加</button>
+</div>
+
+<script>
+  function addScheduleRow() {
+    const tbody = document.getElementById("schedule-body");
+    const rows = tbody.querySelectorAll("tr");
+    let lastEndTime = "";
+    if (rows.length > 0) {
+      lastEndTime = rows[rows.length - 1].querySelector(".end-time").value;
+    }
+
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td><input type="time" class="start-time" value="${lastEndTime}" /></td>
+      <td><input type="time" class="end-time" readonly /></td>
+      <td><input type="number" class="duration" value="30" /></td>
+      <td><textarea rows="2"></textarea></td>
+      <td><input type="text" /></td>
+      <td><input type="number" /></td>
+      <td><textarea rows="2"></textarea></td>
+      <td><textarea rows="2"></textarea></td>
+      <td>
+        <input type="file" accept="image/*" onchange="previewImage(this)" />
+        <img class="image-preview" style="display:none;" onclick="this.previousElementSibling.click()" />
+      </td>
+    `;
+    tbody.appendChild(row);
+    updateSchedule();
+  }
+
+  function previewImage(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      const img = input.nextElementSibling;
+      img.src = e.target.result;
+      img.style.display = "block";
+
+      const gallery = document.getElementById("image-gallery");
+      const galleryImg = document.createElement("img");
+      galleryImg.src = e.target.result;
+      gallery.appendChild(galleryImg);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function updateSchedule() {
+    const rows = document.querySelectorAll("#schedule-body tr");
+    let totalTime = 0;
+    rows.forEach((row, index) => {
+      const start = row.querySelector(".start-time");
+      const end = row.querySelector(".end-time");
+      const dur = parseInt(row.querySelector(".duration").value) || 0;
+      totalTime += dur;
+
+      if (start.value && dur) {
+        const [h, m] = start.value.split(":").map(Number);
+        const d = new Date(0, 0, 0, h, m + dur);
+        const hh = String(d.getHours()).padStart(2, "0");
+        const mm = String(d.getMinutes()).padStart(2, "0");
+        end.value = `${hh}:${mm}`;
+      }
+
+      // 自動で次の開始時間に前の終了時間をセット
+      if (!start.value && index > 0) {
+        const prevEnd = rows[index - 1].querySelector(".end-time").value;
+        start.value = prevEnd;
+        const [h, m] = prevEnd.split(":").map(Number);
+        const d = new Date(0, 0, 0, h, m + dur);
+        const hh = String(d.getHours()).padStart(2, "0");
+        const mm = String(d.getMinutes()).padStart(2, "0");
+        end.value = `${hh}:${mm}`;
+      }
+    });
+    document.getElementById("total-time").textContent = totalTime;
+  }
+
+  document.addEventListener("input", (e) => {
+    if (e.target.closest("#schedule-body")) {
+      updateSchedule();
+    }
+  });
+
+  // 初期行を追加
+  addScheduleRow();
+
+  // Drag and drop functionality
+  function enableDragAndDrop() {
+    const tbody = document.getElementById("schedule-body");
+    let dragged;
+    tbody.querySelectorAll("tr").forEach(row => {
+      row.draggable = true;
+      row.ondragstart = e => dragged = row;
+      row.ondragover = e => e.preventDefault();
+      row.ondrop = e => {
+        e.preventDefault();
+        if (dragged && dragged !== e.target.closest('tr')) {
+          tbody.insertBefore(dragged, e.target.closest('tr'));
+          updateSchedule();
+        }
+      };
+    });
+  }
+
+  // Re-enable drag-and-drop on row add
+  const originalAddScheduleRow = addScheduleRow;
+  addScheduleRow = function() {
+    originalAddScheduleRow();
+    enableDragAndDrop();
+  };
+
+  enableDragAndDrop();
+</script>
+
+</body>
+</html>
